@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dev Hub // Image Converter</title>
+  <style>
+    :root {
+      --base: #1e1e2e;
+      --mantle: #181825;
+      --crust: #11111b;
+      --surface0: #313244;
+      --surface1: #45475a;
+      --text: #cdd6f4;
+      --subtext: #a6adc8;
+      --accent: #cba6f7;
+      --red: #f38ba8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    }
+
+    body {
+      background-color: var(--base);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 780px;
+      background: var(--mantle);
+      border: 1px solid var(--surface0);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--surface0);
+      padding-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      color: var(--accent);
+    }
+
+    .theme-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .theme-bar select {
+      width: auto;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--surface1);
+      background: var(--crust);
+      border-radius: 12px;
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 8%, var(--crust));
+    }
+
+    .drop-zone p {
+      color: var(--subtext);
+      margin-top: 8px;
+      font-size: 0.9rem;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+      background: var(--crust);
+      padding: 18px;
+      border-radius: 12px;
+      border: 1px solid var(--surface0);
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 0.84rem;
+      color: var(--subtext);
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    select {
+      width: 100%;
+      background: var(--surface0);
+      color: var(--text);
+      border: 1px solid var(--surface1);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.92rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--subtext);
+    }
+
+    input[type="color"] {
+      width: 42px;
+      height: 36px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .preview-grid {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 22px;
+    }
+
+    .preview-grid.active {
+      display: grid;
+    }
+
+    .card {
+      background: var(--crust);
+      border: 1px solid var(--surface0);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .card h3 {
+      font-size: 0.88rem;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .card img {
+      max-width: 100%;
+      max-height: 220px;
+      border-radius: 8px;
+      background-image: linear-gradient(45deg, var(--surface0) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--surface0) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--surface0) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--surface0) 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    }
+
+    .meta {
+      margin-top: 10px;
+      font-size: 0.82rem;
+      color: var(--subtext);
+    }
+
+    .actions {
+      display: none;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .actions.active {
+      display: flex;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 18px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--crust);
+    }
+
+    .btn-danger {
+      background: var(--surface0);
+      color: var(--red);
+    }
+
+    @media (max-width: 600px) {
+      .preview-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Image Converter</h1>
+      <div class="theme-bar">
+        <select id="flavorSelect" title="Catppuccin Flavor">
+          <option value="mocha" selected>Mocha</option>
+          <option value="macchiato">Macchiato</option>
+          <option value="frappe">Frappe</option>
+          <option value="latte">Latte</option>
+        </select>
+        <select id="accentSelect" title="Catppuccin Accent">
+          <option value="mauve" selected>Mauve</option>
+          <option value="blue">Blue</option>
+          <option value="lavender">Lavender</option>
+          <option value="sapphire">Sapphire</option>
+          <option value="sky">Sky</option>
+          <option value="teal">Teal</option>
+          <option value="green">Green</option>
+          <option value="yellow">Yellow</option>
+          <option value="peach">Peach</option>
+          <option value="maroon">Maroon</option>
+          <option value="red">Red</option>
+          <option value="pink">Pink</option>
+          <option value="flamingo">Flamingo</option>
+          <option value="rosewater">Rosewater</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="drop-zone" id="dropZone">
+      <strong>Drop any image here or click to browse</strong>
+      <p>Supports PNG, JPG/JPEG, WEBP, GIF, SVG, BMP, and ICO</p>
+      <input type="file" id="fileInput" accept="image/*" hidden />
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="formatSelect">Target Format</label>
+        <select id="formatSelect">
+          <option value="image/png" data-ext="png">PNG (Lossless + Transparent)</option>
+          <option value="image/jpeg" data-ext="jpg">JPG / JPEG (Small Photo)</option>
+          <option value="image/webp" data-ext="webp" selected>WEBP (Modern Web)</option>
+          <option value="image/bmp" data-ext="bmp">BMP (Uncompressed Bitmap)</option>
+          <option value="image/x-icon" data-ext="ico">ICO (Favicon 64x64)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="qualitySlider">Quality <span id="qualityVal">90%</span></label>
+        <input type="range" id="qualitySlider" min="10" max="100" value="90" />
+      </div>
+
+      <div class="control-group">
+        <label for="bgColor">Transparency Fill (JPG/BMP)</label>
+        <div class="row">
+          <input type="color" id="bgColor" value="#1e1e2e" />
+          <span class="hint">Replaces alpha background</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-grid" id="previewGrid">
+      <div class="card">
+        <h3>Original Image</h3>
+        <img id="origPreview" alt="Original preview" />
+        <div class="meta" id="origMeta"></div>
+      </div>
+      <div class="card">
+        <h3>Converted Output</h3>
+        <img id="convPreview" alt="Converted preview" />
+        <div class="meta" id="convMeta"></div>
+      </div>
+    </div>
+
+    <div class="actions" id="actions">
+      <button type="button" class="btn-primary" id="downloadBtn">Download Converted File</button>
+      <button type="button" class="btn-danger" id="clearBtn">Clear</button>
+    </div>
+  </div>
+  <script>
+      const CATPPUCCIN = {
+      mocha: {
+        base: "#1e1e2e", mantle: "#181825", crust: "#11111b",
+        surface0: "#313244", surface1: "#45475a", text: "#cdd6f4", subtext: "#a6adc8",
+        accents: {
+          rosewater: "#f5e0dc", flamingo: "#f2cdcd", pink: "#f5c2e7", mauve: "#cba6f7",
+          red: "#f38ba8", maroon: "#eba0ac", peach: "#fab387", yellow: "#f9e2af",
+          green: "#a6e3a1", teal: "#94e2d5", sky: "#89dceb", sapphire: "#74c7ec",
+          blue: "#89b4fa", lavender: "#b4befe"
+        }
+      },
+      macchiato: {
+        base: "#24273a", mantle: "#1e2030", crust: "#181926",
+        surface0: "#363a4f", surface1: "#494d64", text: "#cad3f5", subtext: "#a5adcb",
+        accents: {
+          rosewater: "#f4dbd6", flamingo: "#f0c6c6", pink: "#f5bde6", mauve: "#c6a0f6",
+          red: "#ed8796", maroon: "#ee99a0", peach: "#f5a97f", yellow: "#eed49f",
+          green: "#a6da95", teal: "#8bd5ca", sky: "#91d7e3", sapphire: "#7dc4e4",
+          blue: "#8aadf4", lavender: "#b7bdf8"
+        }
+      },
+      frappe: {
+        base: "#303446", mantle: "#292c3c", crust: "#232634",
+        surface0: "#414559", surface1: "#51576d", text: "#c6d0f5", subtext: "#a5adce",
+        accents: {
+          rosewater: "#f2d5cf", flamingo: "#eebebe", pink: "#f4b8e4", mauve: "#ca9ee6",
+          red: "#e78284", maroon: "#ea999c", peach: "#ef9f76", yellow: "#e5c890",
+          green: "#a6d189", teal: "#81c8be", sky: "#99d1db", sapphire: "#85c1dc",
+          blue: "#8caaee", lavender: "#babbf1"
+        }
+      },
+      latte: {
+        base: "#eff1f5", mantle: "#e6e9ef", crust: "#dce0e8",
+        surface0: "#ccd0da", surface1: "#bcc0cc", text: "#4c4f69", subtext: "#6c6f85",
+        accents: {
+          rosewater: "#dc8a78", flamingo: "#dd7878", pink: "#ea76cb", mauve: "#8839ef",
+          red: "#d20f39", maroon: "#e64553", peach: "#fe640b", yellow: "#df8e1d",
+          green: "#40a02b", teal: "#179299", sky: "#04a5e5", sapphire: "#209fb5",
+          blue: "#1e66f5", lavender: "#7287fd"
+        }
+      }
+    };
+
+    const flavorSelect = document.getElementById("flavorSelect");
+    const accentSelect = document.getElementById("accentSelect");
+
+    function applyTheme() {
+      const flavorKey = flavorSelect.value;
+      const accentKey = accentSelect.value;
+      const palette = CATPPUCCIN[flavorKey];
+      const root = document.documentElement.style;
+
+      root.setProperty("--base", palette.base);
+      root.setProperty("--mantle", palette.mantle);
+      root.setProperty("--crust", palette.crust);
+      root.setProperty("--surface0", palette.surface0);
+      root.setProperty("--surface1", palette.surface1);
+      root.setProperty("--text", palette.text);
+      root.setProperty("--subtext", palette.subtext);
+      root.setProperty("--accent", palette.accents[accentKey]);
+      root.setProperty("--red", palette.accents.red);
+
+      localStorage.setItem("devhub_ctp_flavor", flavorKey);
+      localStorage.setItem("devhub_ctp_accent", accentKey);
+    }
+
+    const savedFlavor = localStorage.getItem("devhub_ctp_flavor");
+    const savedAccent = localStorage.getItem("devhub_ctp_accent");
+    if (savedFlavor && CATPPUCCIN[savedFlavor]) flavorSelect.value = savedFlavor;
+    if (savedAccent && CATPPUCCIN.mocha.accents[savedAccent]) accentSelect.value = savedAccent;
+    applyTheme();
+
+    flavorSelect.addEventListener("change", applyTheme);
+    accentSelect.addEventListener("change", applyTheme);
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / 1048576).toFixed(2) + " MB";
+    }
+
+    function encodeBMP(canvas) {
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      const imgData = ctx.getImageData(0, 0, w, h).data;
+      const rowSize = Math.floor((24 * w + 31) / 32) * 4;
+      const pixelArraySize = rowSize * h;
+      const fileSize = 54 + pixelArraySize;
+      const buffer = new ArrayBuffer(fileSize);
+      const view = new DataView(buffer);
+
+      view.setUint16(0, 0x424d, false);
+      view.setUint32(2, fileSize, true);
+      view.setUint32(10, 54, true);
+      view.setUint32(14, 40, true);
+      view.setInt32(18, w, true);
+      view.setInt32(22, h, true);
+      view.setUint16(26, 1, true);
+      view.setUint16(28, 24, true);
+      view.setUint32(34, pixelArraySize, true);
+
+      let offset = 54;
+      for (let y = h - 1; y >= 0; y--) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          view.setUint8(offset++, imgData[i + 2]);
+          view.setUint8(offset++, imgData[i + 1]);
+          view.setUint8(offset++, imgData[i]);
+        }
+        while ((offset - 54) % rowSize !== 0) {
+          view.setUint8(offset++, 0);
+        }
+      }
+      return new Blob([buffer], { type: "image/bmp" });
+    }
+
+    async function encodeICO(sourceImg) {
+      const size = 64;
+      const icoCanvas = document.createElement("canvas");
+      icoCanvas.width = size;
+      icoCanvas.height = size;
+      const ctx = icoCanvas.getContext("2d");
+      ctx.drawImage(sourceImg, 0, 0, size, size);
+
+      const pngBlob = await new Promise((res) => icoCanvas.toBlob(res, "image/png"));
+      const pngBytes = new Uint8Array(await pngBlob.arrayBuffer());
+      const icoBuffer = new ArrayBuffer(22 + pngBytes.length);
+      const view = new DataView(icoBuffer);
+
+      view.setUint16(0, 0, true);
+      view.setUint16(2, 1, true);
+      view.setUint16(4, 1, true);
+      view.setUint8(6, size);
+      view.setUint8(7, size);
+      view.setUint8(8, 0);
+      view.setUint8(9, 0);
+      view.setUint16(10, 1, true);
+      view.setUint16(12, 32, true);
+      view.setUint32(14, pngBytes.length, true);
+      view.setUint32(18, 22, true);
+
+      new Uint8Array(icoBuffer, 22).set(pngBytes);
+      return new Blob([icoBuffer], { type: "image/x-icon" });
+    }
+        const dropZone = document.getElementById("dropZone");
+    const fileInput = document.getElementById("fileInput");
+    const formatSelect = document.getElementById("formatSelect");
+    const qualitySlider = document.getElementById("qualitySlider");
+    const qualityVal = document.getElementById("qualityVal");
+    const bgColor = document.getElementById("bgColor");
+    const previewGrid = document.getElementById("previewGrid");
+    const origPreview = document.getElementById("origPreview");
+    const convPreview = document.getElementById("convPreview");
+    const origMeta = document.getElementById("origMeta");
+    const convMeta = document.getElementById("convMeta");
+    const actions = document.getElementById("actions");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const clearBtn = document.getElementById("clearBtn");
+
+    let loadedImage = null;
+    let originalName = "converted";
+    let convertedBlobUrl = null;
+
+    async function convertImage() {
+      if (!loadedImage) return;
+
+      const selectedOption = formatSelect.options.item(formatSelect.selectedIndex);
+      const mime = formatSelect.value;
+      const ext = selectedOption.getAttribute("data-ext");
+      const quality = parseInt(qualitySlider.value, 10) / 100;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = loadedImage.naturalWidth;
+      canvas.height = loadedImage.naturalHeight;
+      const ctx = canvas.getContext("2d");
+
+      if (mime === "image/jpeg" || mime === "image/bmp") {
+        ctx.fillStyle = bgColor.value;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      ctx.drawImage(loadedImage, 0, 0);
+
+      let blob;
+      if (mime === "image/bmp") {
+        blob = encodeBMP(canvas);
+      } else if (mime === "image/x-icon") {
+        blob = await encodeICO(loadedImage);
+      } else {
+        blob = await new Promise((res) => canvas.toBlob(res, mime, quality));
+      }
+
+      if (convertedBlobUrl) URL.revokeObjectURL(convertedBlobUrl);
+      convertedBlobUrl = URL.createObjectURL(blob);
+
+      convPreview.src = convertedBlobUrl;
+      const dims = mime === "image/x-icon" ? "64x64" : canvas.width + "x" + canvas.height;
+      convMeta.textContent = ext.toUpperCase() + " • " + dims + " • " + formatBytes(blob.size);
+
+      downloadBtn.onclick = () => {
+        const a = document.createElement("a");
+        a.href = convertedBlobUrl;
+        a.download = originalName + "." + ext;
+        a.click();
+      };
+    }
+
+    function handleFile(file) {
+      if (!file || !file.type.startsWith("image/")) return;
+      originalName = file.name.replace(/\.[^/.]+$/, "");
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          loadedImage = img;
+          origPreview.src = e.target.result;
+          origMeta.textContent = file.type.replace("image/", "").toUpperCase() + " • " + img.naturalWidth + "x" + img.naturalHeight + " • " + formatBytes(file.size);
+          previewGrid.classList.add("active");
+          actions.classList.add("active");
+          convertImage();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    dropZone.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files ? e.target.files.item(0) : null;
+      if (file) handleFile(file);
+    });
+
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("dragover");
+    });
+
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+      const file = e.dataTransfer.files ? e.dataTransfer.files.item(0) : null;
+      if (file) handleFile(file);
+    });
+
+    formatSelect.addEventListener("change", convertImage);
+    bgColor.addEventListener("input", convertImage);
+    qualitySlider.addEventListener("input", () => {
+      qualityVal.textContent = qualitySlider.value + "%";
+      convertImage();
+    });
+
+    clearBtn.addEventListener("click", () => {
+      loadedImage = null;
+      fileInput.value = "";
+      previewGrid.classList.remove("active");
+      actions.classList.remove("active");
+    });
+  </script>
+</body>
+</html>
