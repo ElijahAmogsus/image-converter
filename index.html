@@ -20,7 +20,7 @@
 
     body { display: flex; flex-direction: column; align-items: center; padding: 30px 16px; }
 
-    .back-link { color: var(--accent); text-decoration: none; font-weight: bold; margin-bottom: 16px; display: inline-block; }
+    .back-link { color: var(--accent); text-decoration: none; font-weight: bold; margin-top: 24px; display: inline-block; }
     .back-link:hover { text-decoration: underline; }
 
     .theme-bar { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; justify-content: center; align-items: center; }
@@ -71,8 +71,6 @@
   </style>
 </head>
 <body>
-  <a href="/" class="back-link">← Back to Dev Hub</a>
-
   <div class="theme-bar">
     <button class="theme-btn active" onclick="setTheme('mocha')">🌿 Mocha</button>
     <button class="theme-btn" onclick="setTheme('macchiato')">🌺 Macchiato</button>
@@ -97,7 +95,7 @@
   </div>
 
   <h1>🔄 Image Converter</h1>
-  <p>Convert images locally between PNG, JPG, WEBP, BMP, and ICO</p>
+  <p>Convert images between PNG, JPG, WEBP, BMP, and ICO</p>
 
   <div class="box">
     <div class="drop-zone" id="dropZone">
@@ -151,12 +149,7 @@
     </div>
   </div>
 
-  <footer style="text-align: center; margin-top: 40px; padding: 20px; font-size: 14px; opacity: 0.8; border-top: 1px solid rgba(128, 128, 128, 0.2); width: 100%; max-width: 720px;">
-    <p style="margin: 0 0 8px 0;">🔒 100% local processing. Your images never leave your device.</p>
-    <a href="https://github.com" target="_blank" rel="noopener noreferrer" style="color: inherit; font-weight: bold; text-decoration: underline;">
-      View Source Code on GitHub
-    </a>
-  </footer>
+  <a href="/" class="back-link">← Back to Dev Hub</a>
     <script>
     const themes = {
       mocha: {
