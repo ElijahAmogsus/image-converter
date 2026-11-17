@@ -46,7 +46,7 @@
     .control-group { display: flex; flex-direction: column; gap: 6px; }
     label { color: var(--subtext0); font-size: 0.9rem; font-weight: bold; }
 
-    select, input[type="range"] { width: 100%; background-color: var(--base); color: var(--text); border: 2px solid var(--surface1); border-radius: 6px; padding: 8px; font-family: monospace; }
+   select:not(.accent-select), input[type="range"] { width: 100%; background-color: var(--base); color: var(--text); border: 2px solid var(--surface1); border-radius: 6px; padding: 8px; font-family: monospace; }
     input[type="range"] { padding: 0; accent-color: var(--accent); cursor: pointer; }
 
     .row { display: flex; align-items: center; gap: 8px; }
