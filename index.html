@@ -64,6 +64,7 @@
     .actions.active { display: flex; }
 
     .btn { flex: 1; padding: 10px 14px; border: 2px solid var(--accent); border-radius: 6px; background-color: var(--accent); color: var(--base); font-family: monospace; font-weight: bold; font-size: 0.95rem; cursor: pointer; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn.secondary { background-color: var(--base); color: var(--text); border-color: var(--surface1); }
     .btn.secondary:hover { border-color: var(--accent); }
 
@@ -278,7 +279,6 @@
     let loadedImage = null;
     let originalName = 'converted';
     let convertedBlobUrl = null;
-    let displayPreviewUrl = null;
 
     async function convertImage() {
       if (!loadedImage) return;
@@ -288,50 +288,63 @@
       const qualityNum = parseInt(qualitySlider.value, 10);
       const quality = qualityNum / 100;
 
-      const canvas = document.createElement('canvas');
-      canvas.width = loadedImage.naturalWidth;
-      canvas.height = loadedImage.naturalHeight;
-      const ctx = canvas.getContext('2d');
+      downloadBtn.disabled = true;
+      downloadBtn.textContent = 'Converting...';
 
-      if (mime === 'image/jpeg' || mime === 'image/bmp') {
-        ctx.fillStyle = bgColor.value;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = loadedImage.naturalWidth;
+        canvas.height = loadedImage.naturalHeight;
+        const ctx = canvas.getContext('2d');
+
+        if (mime === 'image/jpeg' || mime === 'image/bmp') {
+          ctx.fillStyle = bgColor.value;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.drawImage(loadedImage, 0, 0);
+
+        let blob;
+        let previewSrc = null;
+
+        if (mime === 'image/avif' || mime === 'image/jxl') {
+          convMeta.textContent = 'Loading ' + ext.toUpperCase() + ' Wasm encoder...';
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const codecUrl = mime === 'image/avif'
+            ? 'https://jsdelivr.net'
+            : 'https://jsdelivr.net';
+          const codec = await import(codecUrl);
+          convMeta.textContent = 'Encoding ' + ext.toUpperCase() + '...';
+          const outBuffer = await codec.encode(imgData, { quality: qualityNum });
+          blob = new Blob([outBuffer], { type: mime });
+          previewSrc = canvas.toDataURL('image/png');
+        } else if (mime === 'image/bmp') {
+          blob = encodeBMP(canvas);
+        } else if (mime === 'image/x-icon') {
+          blob = await encodeICO(loadedImage);
+        } else {
+          blob = await new Promise(res => canvas.toBlob(res, mime, quality));
+        }
+
+        if (convertedBlobUrl) URL.revokeObjectURL(convertedBlobUrl);
+        convertedBlobUrl = URL.createObjectURL(blob);
+
+        convPreview.src = previewSrc || convertedBlobUrl;
+        const dims = mime === 'image/x-icon' ? '64×64' : canvas.width + '×' + canvas.height;
+        convMeta.textContent = ext.toUpperCase() + ' • ' + dims + ' • ' + formatBytes(blob.size);
+
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = 'Download Converted File';
+        downloadBtn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = convertedBlobUrl;
+          a.download = originalName + '.' + ext;
+          a.click();
+        };
+      } catch (err) {
+        console.error(err);
+        convMeta.textContent = 'Error: ' + err.message;
+        downloadBtn.textContent = 'Conversion Failed';
       }
-      ctx.drawImage(loadedImage, 0, 0);
-
-      let blob;
-      let previewSrc = null;
-
-      if (mime === 'image/avif' || mime === 'image/jxl') {
-        convMeta.textContent = 'Loading ' + ext.toUpperCase() + ' Wasm encoder...';
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const codec = mime === 'image/avif'
-          ? await import('https://esm.sh')
-          : await import('https://esm.sh');
-        const outBuffer = await codec.encode(imgData, { quality: qualityNum });
-        blob = new Blob([outBuffer], { type: mime });
-        previewSrc = canvas.toDataURL('image/png');
-      } else if (mime === 'image/bmp') {
-        blob = encodeBMP(canvas);
-      } else if (mime === 'image/x-icon') {
-        blob = await encodeICO(loadedImage);
-      } else {
-        blob = await new Promise(res => canvas.toBlob(res, mime, quality));
-      }
-
-      if (convertedBlobUrl) URL.revokeObjectURL(convertedBlobUrl);
-      convertedBlobUrl = URL.createObjectURL(blob);
-
-      convPreview.src = previewSrc || convertedBlobUrl;
-      const dims = mime === 'image/x-icon' ? '64×64' : canvas.width + '×' + canvas.height;
-      convMeta.textContent = ext.toUpperCase() + ' • ' + dims + ' • ' + formatBytes(blob.size);
-
-      downloadBtn.onclick = () => {
-        const a = document.createElement('a');
-        a.href = convertedBlobUrl;
-        a.download = originalName + '.' + ext;
-        a.click();
-      };
     }
 
     async function handleFile(file) {
@@ -345,27 +358,33 @@
       actions.classList.add('active');
 
       if (isNextGen) {
-        origMeta.textContent = 'Decoding ' + ext.toUpperCase() + '...';
-        const buffer = await file.arrayBuffer();
-        const codec = ext === 'avif'
-          ? await import('https://esm.sh')
-          : await import('https://esm.sh');
-        const imageData = await codec.decode(buffer);
+        try {
+          origMeta.textContent = 'Decoding ' + ext.toUpperCase() + '...';
+          const buffer = await file.arrayBuffer();
+          const codecUrl = ext === 'avif'
+            ? 'https://jsdelivr.net'
+            : 'https://jsdelivr.net';
+          const codec = await import(codecUrl);
+          const imageData = await codec.decode(buffer);
 
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = imageData.width;
-        tempCanvas.height = imageData.height;
-        tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = imageData.width;
+          tempCanvas.height = imageData.height;
+          tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
 
-        const dataUrl = tempCanvas.toDataURL('image/png');
-        const img = new Image();
-        img.onload = () => {
-          loadedImage = img;
-          origPreview.src = dataUrl;
-          origMeta.textContent = ext.toUpperCase() + ' • ' + img.naturalWidth + '×' + img.naturalHeight + ' • ' + formatBytes(file.size);
-          convertImage();
-        };
-        img.src = dataUrl;
+          const dataUrl = tempCanvas.toDataURL('image/png');
+          const img = new Image();
+          img.onload = () => {
+            loadedImage = img;
+            origPreview.src = dataUrl;
+            origMeta.textContent = ext.toUpperCase() + ' • ' + img.naturalWidth + '×' + img.naturalHeight + ' • ' + formatBytes(file.size);
+            convertImage();
+          };
+          img.src = dataUrl;
+        } catch (err) {
+          console.error(err);
+          origMeta.textContent = 'Decode Error: ' + err.message;
+        }
       } else {
         const reader = new FileReader();
         reader.onload = e => {
