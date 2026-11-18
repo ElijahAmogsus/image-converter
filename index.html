@@ -64,7 +64,6 @@
     .actions.active { display: flex; }
 
     .btn { flex: 1; padding: 10px 14px; border: 2px solid var(--accent); border-radius: 6px; background-color: var(--accent); color: var(--base); font-family: monospace; font-weight: bold; font-size: 0.95rem; cursor: pointer; }
-    .btn:disabled { opacity: 0.6; cursor: wait; }
     .btn.secondary { background-color: var(--base); color: var(--text); border-color: var(--surface1); }
     .btn.secondary:hover { border-color: var(--accent); }
 
@@ -96,13 +95,13 @@
   </div>
 
   <h1>🔄 Image Converter</h1>
-  <p>Convert between PNG, JPG, WEBP, Real AVIF, BMP, ICO, and SVG</p>
+  <p>Convert images between PNG, JPG, WEBP, BMP, ICO, and SVG</p>
 
   <div class="box">
     <div class="drop-zone" id="dropZone">
       <strong>Drop any image here or click to browse</strong>
-      <div style="color: var(--subtext0); font-size: 0.85rem; margin-top: 6px;">PNG, JPG, WEBP, AVIF, GIF, SVG, BMP, ICO, TIFF</div>
-      <input type="file" id="fileInput" accept="image/*,.png,.jpg,.jpeg,.webp,.avif,.gif,.svg,.bmp,.ico,.tif,.tiff" hidden>
+      <div style="color: var(--subtext0); font-size: 0.85rem; margin-top: 6px;">PNG, JPG, WEBP, SVG, BMP, ICO, AVIF, TIFF</div>
+      <input type="file" id="fileInput" accept="image/*,.png,.jpg,.jpeg,.webp,.svg,.bmp,.ico,.avif,.tif,.tiff" hidden>
     </div>
 
     <div class="controls">
@@ -112,7 +111,6 @@
           <option value="image/png" data-ext="png">PNG (Lossless)</option>
           <option value="image/jpeg" data-ext="jpg">JPG / JPEG</option>
           <option value="image/webp" data-ext="webp" selected>WEBP</option>
-          <option value="image/avif" data-ext="avif">AVIF (Real AV1)</option>
           <option value="image/bmp" data-ext="bmp">BMP (24-bit)</option>
           <option value="image/x-icon" data-ext="ico">ICO (64×64 Favicon)</option>
           <option value="image/svg+xml" data-ext="svg">SVG (Vector Wrapper)</option>
@@ -269,17 +267,6 @@
       const svg = '<svg xmlns="http://w3.org" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><image href="' + dataUrl + '" width="' + w + '" height="' + h + '"/></svg>';
       return new Blob(Array.of(svg), { type: 'image/svg+xml' });
     }
-
-    let avifModule = null;
-    async function encodeRealAVIF(canvas, qualityPct) {
-      if (!avifModule) {
-        avifModule = await import('https://esm.sh');
-      }
-      const ctx = canvas.getContext('2d');
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const avifBuffer = await avifModule.encode(imageData, { quality: qualityPct, speed: 6 });
-      return new Blob(Array.of(avifBuffer), { type: 'image/avif' });
-    }
           const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const formatSelect = document.getElementById('formatSelect');
@@ -298,16 +285,13 @@
     let loadedImage = null;
     let originalName = 'converted';
     let convertedBlobUrl = null;
-    let convertJobId = 0;
 
     async function convertImage() {
       if (!loadedImage) return;
-      const jobId = ++convertJobId;
       const selectedOption = formatSelect.options.item(formatSelect.selectedIndex);
       const mime = formatSelect.value;
       const ext = selectedOption.getAttribute('data-ext');
-      const qualityPct = parseInt(qualitySlider.value, 10);
-      const quality = qualityPct / 100;
+      const quality = parseInt(qualitySlider.value, 10) / 100;
 
       const canvas = document.createElement('canvas');
       canvas.width = loadedImage.naturalWidth || 512;
@@ -321,28 +305,10 @@
       ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
 
       let blob;
-      if (mime === 'image/bmp') {
-        blob = encodeBMP(canvas);
-      } else if (mime === 'image/x-icon') {
-        blob = await encodeICO(loadedImage);
-      } else if (mime === 'image/svg+xml') {
-        blob = encodeSVG(canvas);
-      } else if (mime === 'image/avif') {
-        convMeta.textContent = 'Encoding real AVIF (AV1)...';
-        downloadBtn.disabled = true;
-        try {
-          blob = await encodeRealAVIF(canvas, qualityPct);
-        } catch (err) {
-          convMeta.textContent = 'AVIF encoder failed: ' + err.message;
-          downloadBtn.disabled = false;
-          return;
-        }
-        downloadBtn.disabled = false;
-      } else {
-        blob = await new Promise(res => canvas.toBlob(res, mime, quality));
-      }
-
-      if (jobId !== convertJobId) return;
+      if (mime === 'image/bmp') blob = encodeBMP(canvas);
+      else if (mime === 'image/x-icon') blob = await encodeICO(loadedImage);
+      else if (mime === 'image/svg+xml') blob = encodeSVG(canvas);
+      else blob = await new Promise(res => canvas.toBlob(res, mime, quality));
 
       if (convertedBlobUrl) URL.revokeObjectURL(convertedBlobUrl);
       convertedBlobUrl = URL.createObjectURL(blob);
