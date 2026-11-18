@@ -276,6 +276,11 @@
     const downloadBtn = document.getElementById('downloadBtn');
     const clearBtn = document.getElementById('clearBtn');
 
+    const CODEC_URLS = {
+      avif: 'https://esm.sh',
+      jxl: 'https://esm.sh'
+    };
+
     let loadedImage = null;
     let originalName = 'converted';
     let convertedBlobUrl = null;
@@ -309,10 +314,7 @@
         if (mime === 'image/avif' || mime === 'image/jxl') {
           convMeta.textContent = 'Loading ' + ext.toUpperCase() + ' Wasm encoder...';
           const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const codecUrl = mime === 'image/avif'
-            ? 'https://jsdelivr.net'
-            : 'https://jsdelivr.net';
-          const codec = await import(codecUrl);
+          const codec = await import(CODEC_URLS[ext]);
           convMeta.textContent = 'Encoding ' + ext.toUpperCase() + '...';
           const outBuffer = await codec.encode(imgData, { quality: qualityNum });
           blob = new Blob([outBuffer], { type: mime });
@@ -361,10 +363,7 @@
         try {
           origMeta.textContent = 'Decoding ' + ext.toUpperCase() + '...';
           const buffer = await file.arrayBuffer();
-          const codecUrl = ext === 'avif'
-            ? 'https://jsdelivr.net'
-            : 'https://jsdelivr.net';
-          const codec = await import(codecUrl);
+          const codec = await import(CODEC_URLS[ext]);
           const imageData = await codec.decode(buffer);
 
           const tempCanvas = document.createElement('canvas');
