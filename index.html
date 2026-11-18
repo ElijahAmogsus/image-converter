@@ -58,7 +58,8 @@
     .card { background-color: var(--base); border: 2px solid var(--surface1); border-radius: 8px; padding: 12px; text-align: center; }
     .card h3 { color: var(--accent); margin: 0 0 8px 0; font-size: 1rem; }
     .card img { max-width: 100%; max-height: 200px; border-radius: 6px; }
-    .meta { color: var(--subtext0); font-size: 0.85rem; margin-top: 8px; }
+    .card img:not([src]), .card img[src=""] { display: none; }
+    .meta { color: var(--subtext0); font-size: 0.85rem; margin-top: 8px; word-break: break-word; }
 
     .actions { display: none; gap: 10px; margin-top: 18px; }
     .actions.active { display: flex; }
@@ -261,7 +262,7 @@
       new Uint8Array(icoBuffer, 22).set(pngBytes);
       return new Blob([icoBuffer], { type: 'image/x-icon' });
     }
-         const dropZone = document.getElementById('dropZone');
+          const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const formatSelect = document.getElementById('formatSelect');
     const qualitySlider = document.getElementById('qualitySlider');
@@ -277,13 +278,19 @@
     const clearBtn = document.getElementById('clearBtn');
 
     const CODEC_URLS = {
-      avif: 'https://unpkg.com',
-      jxl: 'https://unpkg.com'
+      avif: 'https://esm.sh',
+      jxl: 'https://esm.sh'
     };
 
     let loadedImage = null;
     let originalName = 'converted';
     let convertedBlobUrl = null;
+
+    async function tryNativeAvif(canvas, quality) {
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/avif', quality));
+      if (blob && blob.type === 'image/avif') return blob;
+      return null;
+    }
 
     async function convertImage() {
       if (!loadedImage) return;
@@ -295,6 +302,7 @@
 
       downloadBtn.disabled = true;
       downloadBtn.textContent = 'Converting...';
+      convPreview.removeAttribute('src');
 
       try {
         const canvas = document.createElement('canvas');
@@ -308,10 +316,14 @@
         }
         ctx.drawImage(loadedImage, 0, 0);
 
-        let blob;
+        let blob = null;
         let previewSrc = null;
 
-        if (mime === 'image/avif' || mime === 'image/jxl') {
+        if (mime === 'image/avif') {
+          blob = await tryNativeAvif(canvas, quality);
+        }
+
+        if (!blob && (mime === 'image/avif' || mime === 'image/jxl')) {
           convMeta.textContent = 'Loading ' + ext.toUpperCase() + ' Wasm encoder...';
           const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const codec = await import(CODEC_URLS[ext]);
@@ -323,7 +335,7 @@
           blob = encodeBMP(canvas);
         } else if (mime === 'image/x-icon') {
           blob = await encodeICO(loadedImage);
-        } else {
+        } else if (!blob) {
           blob = await new Promise(res => canvas.toBlob(res, mime, quality));
         }
 
@@ -420,6 +432,8 @@
     clearBtn.addEventListener('click', () => {
       loadedImage = null;
       fileInput.value = '';
+      origPreview.removeAttribute('src');
+      convPreview.removeAttribute('src');
       previewGrid.classList.remove('active');
       actions.classList.remove('active');
     });
