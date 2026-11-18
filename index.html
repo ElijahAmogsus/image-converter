@@ -95,13 +95,13 @@
   </div>
 
   <h1>🔄 Image Converter</h1>
-  <p>Convert images between PNG, JPG, WEBP, BMP, and ICO</p>
+  <p>Convert between PNG, JPG, WEBP, AVIF, BMP, ICO, and SVG</p>
 
   <div class="box">
     <div class="drop-zone" id="dropZone">
       <strong>Drop any image here or click to browse</strong>
-      <div style="color: var(--subtext0); font-size: 0.85rem; margin-top: 6px;">PNG, JPG, WEBP, GIF, SVG, BMP, ICO</div>
-      <input type="file" id="fileInput" accept="image/*" hidden>
+      <div style="color: var(--subtext0); font-size: 0.85rem; margin-top: 6px;">PNG, JPG, WEBP, AVIF, GIF, SVG, BMP, ICO, TIFF</div>
+      <input type="file" id="fileInput" accept="image/*,.png,.jpg,.jpeg,.webp,.avif,.gif,.svg,.bmp,.ico,.tif,.tiff" hidden>
     </div>
 
     <div class="controls">
@@ -111,8 +111,10 @@
           <option value="image/png" data-ext="png">PNG (Lossless)</option>
           <option value="image/jpeg" data-ext="jpg">JPG / JPEG</option>
           <option value="image/webp" data-ext="webp" selected>WEBP</option>
+          <option value="image/avif" data-ext="avif">AVIF (Next-Gen)</option>
           <option value="image/bmp" data-ext="bmp">BMP (24-bit)</option>
           <option value="image/x-icon" data-ext="ico">ICO (64×64 Favicon)</option>
+          <option value="image/svg+xml" data-ext="svg">SVG (Vector Wrapper)</option>
         </select>
       </div>
 
@@ -222,13 +224,13 @@
       for (let y = h - 1; y >= 0; y--) {
         for (let x = 0; x < w; x++) {
           const i = (y * w + x) * 4;
-          view.setUint8(offset++, imgData[i + 2]);
-          view.setUint8(offset++, imgData[i + 1]);
-          view.setUint8(offset++, imgData[i]);
+          view.setUint8(offset++, imgData.at(i + 2));
+          view.setUint8(offset++, imgData.at(i + 1));
+          view.setUint8(offset++, imgData.at(i));
         }
         while ((offset - 54) % rowSize !== 0) view.setUint8(offset++, 0);
       }
-      return new Blob([buffer], { type: 'image/bmp' });
+      return new Blob(Array.of(buffer), { type: 'image/bmp' });
     }
 
     async function encodeICO(sourceImg) {
@@ -256,7 +258,15 @@
       view.setUint32(18, 22, true);
 
       new Uint8Array(icoBuffer, 22).set(pngBytes);
-      return new Blob([icoBuffer], { type: 'image/x-icon' });
+      return new Blob(Array.of(icoBuffer), { type: 'image/x-icon' });
+    }
+
+    function encodeSVG(canvas) {
+      const w = canvas.width;
+      const h = canvas.height;
+      const dataUrl = canvas.toDataURL('image/png');
+      const svg = '<svg xmlns="http://w3.org" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><image href="' + dataUrl + '" width="' + w + '" height="' + h + '"/></svg>';
+      return new Blob(Array.of(svg), { type: 'image/svg+xml' });
     }
           const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
@@ -281,24 +291,33 @@
       if (!loadedImage) return;
       const selectedOption = formatSelect.options.item(formatSelect.selectedIndex);
       const mime = formatSelect.value;
-      const ext = selectedOption.getAttribute('data-ext');
+      let ext = selectedOption.getAttribute('data-ext');
       const quality = parseInt(qualitySlider.value, 10) / 100;
 
       const canvas = document.createElement('canvas');
-      canvas.width = loadedImage.naturalWidth;
-      canvas.height = loadedImage.naturalHeight;
+      canvas.width = loadedImage.naturalWidth || 512;
+      canvas.height = loadedImage.naturalHeight || 512;
       const ctx = canvas.getContext('2d');
 
       if (mime === 'image/jpeg' || mime === 'image/bmp') {
         ctx.fillStyle = bgColor.value;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
-      ctx.drawImage(loadedImage, 0, 0);
+      ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
 
       let blob;
       if (mime === 'image/bmp') blob = encodeBMP(canvas);
       else if (mime === 'image/x-icon') blob = await encodeICO(loadedImage);
-      else blob = await new Promise(res => canvas.toBlob(res, mime, quality));
+      else if (mime === 'image/svg+xml') blob = encodeSVG(canvas);
+      else if (mime === 'image/avif') {
+        blob = await new Promise(res => canvas.toBlob(res, 'image/avif', quality));
+        if (!blob || blob.type !== 'image/avif') {
+          blob = await new Promise(res => canvas.toBlob(res, 'image/webp', quality));
+          ext = 'webp';
+        }
+      } else {
+        blob = await new Promise(res => canvas.toBlob(res, mime, quality));
+      }
 
       if (convertedBlobUrl) URL.revokeObjectURL(convertedBlobUrl);
       convertedBlobUrl = URL.createObjectURL(blob);
@@ -316,7 +335,7 @@
     }
 
     function handleFile(file) {
-      if (!file || !file.type.startsWith('image/')) return;
+      if (!file) return;
       originalName = file.name.replace(/\.[^/.]+$/, '');
       const reader = new FileReader();
       reader.onload = e => {
@@ -324,7 +343,8 @@
         img.onload = () => {
           loadedImage = img;
           origPreview.src = e.target.result;
-          origMeta.textContent = file.type.replace('image/', '').toUpperCase() + ' • ' + img.naturalWidth + '×' + img.naturalHeight + ' • ' + formatBytes(file.size);
+          const rawType = (file.type || file.name.split('.').pop() || 'IMG').replace('image/', '').toUpperCase();
+          origMeta.textContent = rawType + ' • ' + (img.naturalWidth || 512) + '×' + (img.naturalHeight || 512) + ' • ' + formatBytes(file.size);
           previewGrid.classList.add('active');
           actions.classList.add('active');
           convertImage();
