@@ -46,7 +46,7 @@
     .control-group { display: flex; flex-direction: column; gap: 6px; }
     label { color: var(--subtext0); font-size: 0.9rem; font-weight: bold; }
 
-   select:not(.accent-select), input[type="range"] { width: 100%; background-color: var(--base); color: var(--text); border: 2px solid var(--surface1); border-radius: 6px; padding: 8px; font-family: monospace; }
+    select:not(.accent-select), input[type="range"] { width: 100%; background-color: var(--base); color: var(--text); border: 2px solid var(--surface1); border-radius: 6px; padding: 8px; font-family: monospace; }
     input[type="range"] { padding: 0; accent-color: var(--accent); cursor: pointer; }
 
     .row { display: flex; align-items: center; gap: 8px; }
@@ -95,13 +95,13 @@
   </div>
 
   <h1>🔄 Image Converter</h1>
-  <p>Convert images between PNG, JPG, WEBP, BMP, and ICO</p>
+  <p>Convert images between PNG, JPG, WEBP, AVIF, JXL, BMP, and ICO</p>
 
   <div class="box">
     <div class="drop-zone" id="dropZone">
       <strong>Drop any image here or click to browse</strong>
-      <div style="color: var(--subtext0); font-size: 0.85rem; margin-top: 6px;">PNG, JPG, WEBP, GIF, SVG, BMP, ICO</div>
-      <input type="file" id="fileInput" accept="image/*" hidden>
+      <div style="color: var(--subtext0); font-size: 0.85rem; margin-top: 6px;">PNG, JPG, WEBP, AVIF, JXL, GIF, SVG, BMP, ICO</div>
+      <input type="file" id="fileInput" accept="image/*,.avif,.jxl" hidden>
     </div>
 
     <div class="controls">
@@ -111,6 +111,8 @@
           <option value="image/png" data-ext="png">PNG (Lossless)</option>
           <option value="image/jpeg" data-ext="jpg">JPG / JPEG</option>
           <option value="image/webp" data-ext="webp" selected>WEBP</option>
+          <option value="image/avif" data-ext="avif">AVIF (Next-Gen)</option>
+          <option value="image/jxl" data-ext="jxl">JXL (JPEG XL)</option>
           <option value="image/bmp" data-ext="bmp">BMP (24-bit)</option>
           <option value="image/x-icon" data-ext="ico">ICO (64×64 Favicon)</option>
         </select>
@@ -150,7 +152,7 @@
   </div>
 
   <a href="/" class="back-link">← Back to Dev Hub</a>
-    <script>
+    <script type="module">
     const themes = {
       mocha: {
         base: '#1e1e2e', mantle: '#181825', surface0: '#313244', surface1: '#45475a', text: '#cdd6f4', subtext0: '#a6adc8',
@@ -187,8 +189,8 @@
       document.getElementById('accentSelect').value = currentAccent;
     }
 
-    function setTheme(name) { currentTheme = name; localStorage.setItem('catppuccin-theme', name); applyPalette(); }
-    function setAccent(accent) { currentAccent = accent; localStorage.setItem('catppuccin-accent', accent); applyPalette(); }
+    window.setTheme = function(name) { currentTheme = name; localStorage.setItem('catppuccin-theme', name); applyPalette(); };
+    window.setAccent = function(accent) { currentAccent = accent; localStorage.setItem('catppuccin-accent', accent); applyPalette(); };
     applyPalette();
 
     function formatBytes(bytes) {
@@ -276,13 +278,15 @@
     let loadedImage = null;
     let originalName = 'converted';
     let convertedBlobUrl = null;
+    let displayPreviewUrl = null;
 
     async function convertImage() {
       if (!loadedImage) return;
       const selectedOption = formatSelect.options.item(formatSelect.selectedIndex);
       const mime = formatSelect.value;
       const ext = selectedOption.getAttribute('data-ext');
-      const quality = parseInt(qualitySlider.value, 10) / 100;
+      const qualityNum = parseInt(qualitySlider.value, 10);
+      const quality = qualityNum / 100;
 
       const canvas = document.createElement('canvas');
       canvas.width = loadedImage.naturalWidth;
@@ -296,14 +300,29 @@
       ctx.drawImage(loadedImage, 0, 0);
 
       let blob;
-      if (mime === 'image/bmp') blob = encodeBMP(canvas);
-      else if (mime === 'image/x-icon') blob = await encodeICO(loadedImage);
-      else blob = await new Promise(res => canvas.toBlob(res, mime, quality));
+      let previewSrc = null;
+
+      if (mime === 'image/avif' || mime === 'image/jxl') {
+        convMeta.textContent = 'Loading ' + ext.toUpperCase() + ' Wasm encoder...';
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const codec = mime === 'image/avif'
+          ? await import('https://esm.sh')
+          : await import('https://esm.sh');
+        const outBuffer = await codec.encode(imgData, { quality: qualityNum });
+        blob = new Blob([outBuffer], { type: mime });
+        previewSrc = canvas.toDataURL('image/png');
+      } else if (mime === 'image/bmp') {
+        blob = encodeBMP(canvas);
+      } else if (mime === 'image/x-icon') {
+        blob = await encodeICO(loadedImage);
+      } else {
+        blob = await new Promise(res => canvas.toBlob(res, mime, quality));
+      }
 
       if (convertedBlobUrl) URL.revokeObjectURL(convertedBlobUrl);
       convertedBlobUrl = URL.createObjectURL(blob);
 
-      convPreview.src = convertedBlobUrl;
+      convPreview.src = previewSrc || convertedBlobUrl;
       const dims = mime === 'image/x-icon' ? '64×64' : canvas.width + '×' + canvas.height;
       convMeta.textContent = ext.toUpperCase() + ' • ' + dims + ' • ' + formatBytes(blob.size);
 
@@ -315,23 +334,53 @@
       };
     }
 
-    function handleFile(file) {
-      if (!file || !file.type.startsWith('image/')) return;
+    async function handleFile(file) {
+      if (!file) return;
+      const ext = file.name.split('.').pop().toLowerCase();
+      const isNextGen = ext === 'avif' || ext === 'jxl';
+      if (!file.type.startsWith('image/') && !isNextGen) return;
+
       originalName = file.name.replace(/\.[^/.]+$/, '');
-      const reader = new FileReader();
-      reader.onload = e => {
+      previewGrid.classList.add('active');
+      actions.classList.add('active');
+
+      if (isNextGen) {
+        origMeta.textContent = 'Decoding ' + ext.toUpperCase() + '...';
+        const buffer = await file.arrayBuffer();
+        const codec = ext === 'avif'
+          ? await import('https://esm.sh')
+          : await import('https://esm.sh');
+        const imageData = await codec.decode(buffer);
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = imageData.width;
+        tempCanvas.height = imageData.height;
+        tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
+
+        const dataUrl = tempCanvas.toDataURL('image/png');
         const img = new Image();
         img.onload = () => {
           loadedImage = img;
-          origPreview.src = e.target.result;
-          origMeta.textContent = file.type.replace('image/', '').toUpperCase() + ' • ' + img.naturalWidth + '×' + img.naturalHeight + ' • ' + formatBytes(file.size);
-          previewGrid.classList.add('active');
-          actions.classList.add('active');
+          origPreview.src = dataUrl;
+          origMeta.textContent = ext.toUpperCase() + ' • ' + img.naturalWidth + '×' + img.naturalHeight + ' • ' + formatBytes(file.size);
           convertImage();
         };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
+        img.src = dataUrl;
+      } else {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            loadedImage = img;
+            origPreview.src = e.target.result;
+            const label = (file.type.replace('image/', '') || ext).toUpperCase();
+            origMeta.textContent = label + ' • ' + img.naturalWidth + '×' + img.naturalHeight + ' • ' + formatBytes(file.size);
+            convertImage();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
     }
 
     dropZone.addEventListener('click', () => fileInput.click());
