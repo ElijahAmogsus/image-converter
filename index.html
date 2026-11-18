@@ -261,7 +261,7 @@
       new Uint8Array(icoBuffer, 22).set(pngBytes);
       return new Blob([icoBuffer], { type: 'image/x-icon' });
     }
-          const dropZone = document.getElementById('dropZone');
+         const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const formatSelect = document.getElementById('formatSelect');
     const qualitySlider = document.getElementById('qualitySlider');
@@ -277,8 +277,8 @@
     const clearBtn = document.getElementById('clearBtn');
 
     const CODEC_URLS = {
-      avif: 'https://esm.sh',
-      jxl: 'https://esm.sh'
+      avif: 'https://unpkg.com',
+      jxl: 'https://unpkg.com'
     };
 
     let loadedImage = null;
